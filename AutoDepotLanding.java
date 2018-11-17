@@ -1,11 +1,47 @@
+/* Copyright (c) 2017 FIRST. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted (subject to the limitations in the disclaimer below) provided that
+ * the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ *
+ * Neither the name of FIRST nor the names of its contributors may be used to endorse or
+ * promote products derived from this software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
+ * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.hardware.rev.Rev2mDistanceSensor;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
+import com.qualcomm.robotcore.hardware.Servo;
+
 
 /**
  * This file illustrates the concept of driving a path based on encoder counts.
@@ -34,10 +70,12 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 
-@Autonomous(name="AutoCrater", group="Pushbot")
+@Autonomous(name="AutoDepotLanding", group="Autonomous")
 
-public class AutoCrater extends LinearOpMode {
-
+public class AutoDepotLanding extends LinearOpMode {
+    
+    private DistanceSensor sensorRange;
+    
     /* Declare OpMode members. */
     RevRobotHardware         robot   = new RevRobotHardware();   // Use a Pushbot's hardware
     private ElapsedTime     runtime = new ElapsedTime();
@@ -49,6 +87,17 @@ public class AutoCrater extends LinearOpMode {
                                                       (WHEEL_DIAMETER_INCHES * 3.1415);
     static final double     DRIVE_SPEED             = 2.0;
     static final double     TURN_SPEED              = 0.5;
+    static final double     LIFT_SPEED              = 1.0;
+
+     static final double INCREMENT   = 0.01;     // amount to slew servo each CYCLE_MS cycle
+    static final int    CYCLE_MS    =   50;     // period of each cycle
+    static final double MAX_POS     =  1.0;     // Maximum rotational position
+    static final double MIN_POS     =  0.0;     // Minimum rotational position
+
+    // Define class members
+    Servo   servo;
+    double  position = (MAX_POS - MIN_POS) / 2; // Start at halfway position
+    boolean rampUp = true;
 
     @Override
     public void runOpMode() {
@@ -58,17 +107,44 @@ public class AutoCrater extends LinearOpMode {
          * The init() method of the hardware class does all the work here
          */
         robot.init(hardwareMap);
+        sensorRange = hardwareMap.get(DistanceSensor.class, "distanceSensor");
+        
+        servo = hardwareMap.get(Servo.class, "team_marker");
 
+        // Wait for the start button
+        telemetry.addData(">", "Press Start to scan Servo." );
+        telemetry.update();
+        // you can also cast this to a Rev2mDistanceSensor if you want to use added
+        // methods associated with the Rev2mDistanceSensor class.
+        Rev2mDistanceSensor sensorTimeOfFlight = (Rev2mDistanceSensor)sensorRange;
         // Send telemetry message to signify robot waiting;
         telemetry.addData("Status", "Resetting Encoders");    //
         telemetry.update();
+        
+        telemetry.addData("deviceName",sensorRange.getDeviceName() );
+            telemetry.addData("range", String.format("%.01f mm", sensorRange.getDistance(DistanceUnit.MM)));
+            telemetry.addData("range", String.format("%.01f cm", sensorRange.getDistance(DistanceUnit.CM)));
+            telemetry.addData("range", String.format("%.01f m", sensorRange.getDistance(DistanceUnit.METER)));
+            telemetry.addData("range", String.format("%.01f in", sensorRange.getDistance(DistanceUnit.INCH)));
 
+            // Rev2mDistanceSensor specific methods.
+            telemetry.addData("ID", String.format("%x", sensorTimeOfFlight.getModelID()));
+            telemetry.addData("did time out", Boolean.toString(sensorTimeOfFlight.didTimeoutOccur()));
+
+            telemetry.update();
+        robot.liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        robot.liftMotor.setPower(0);
+        robot.leftDrive.setPower(0);
+        robot.rightDrive.setPower(0);
+        
         robot.leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         robot.rightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
+        robot.liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        
         robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-
+        robot.liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        
         // Send telemetry message to indicate successful Encoder reset
         telemetry.addData("Path0",  "Starting at %7d :%7d",
                           robot.leftDrive.getCurrentPosition(),
@@ -78,19 +154,52 @@ public class AutoCrater extends LinearOpMode {
         // Wait for the game to start (driver presses PLAY)
         waitForStart();
 
+        //Lower Robot 
+        while(sensorRange.getDistance(DistanceUnit.CM) > 4.0) {
+        robot.liftMotor.setPower(1);
+        sleep(10);
+        }
+        robot.liftMotor.setPower(0);
+        robot.liftMotor.setPower(1);
+        sleep(400);
+        robot.liftMotor.setPower(0);
+      
+      encoderDrive(-DRIVE_SPEED, -3, 3, 10 );
+      //sleep(4000);
+      robot.liftMotor.setPower(-1);
+      sleep(1000);
+      robot.liftMotor.setPower(0);
+      encoderDrive(-DRIVE_SPEED, 3, -3, 10 );
+      
+      //turn slightly and then turn back 
+      
+     
+      
         // Step through each leg of the path,
         // Note: Reverse movement is obtained by setting a negative distance (not speed)
-        encoderDrive(DRIVE_SPEED,  -55,  -55, 60.0);  //backwards 25 Inches with 60 Sec timeout
-        //encoderDrive(DRIVE_SPEED, 11, 11, 60.0); //foward after hitting mineral
-        //encoderDrive(DRIVE_SPEED, 11, -11, 60.0); // turn after sampling
-        //encoderDrive(DRIVE_SPEED, 49, 49, 60.0); //backup towards wall
-        //encoderDrive(DRIVE_SPEED, -5, 5, 60.0); //turn towards depot
-        //encoderDrive(DRIVE_SPEED, 50, 50, 60.0); //back up to depot
-        //drop marker
-        //encoderDrive(DRIVE_SPEED, -80, -80, 60.0); //goes back to crater
-        
-        sleep(1000);     // pause for servos to move
+      
+        encoderDrive(DRIVE_SPEED,  -50,  -50, 60.0);  // S1: backwards 25 Inches with 5 Sec timeout
+        position = 0.9;
+        sleep(1000);
+        telemetry.addData("Servo Position", "%5.2f", position);
+            telemetry.addData(">", "Press Stop to end test." );
+            telemetry.update();
 
+            // Set the servo to the new position and pause;
+            servo.setPosition(position);
+            sleep(CYCLE_MS);
+            idle();
+        sleep(1000);
+        
+        encoderDrive(DRIVE_SPEED, 7, -7, 60.0); //Turn after going to depot/ dropping off marker
+        encoderDrive(DRIVE_SPEED, 75, 75, 60.0); // back up into crater
+        
+      
+        
+        
+
+            // Set the servo to the new position and pause;
+            
         telemetry.addData("Path", "Complete");
         telemetry.update();
     }

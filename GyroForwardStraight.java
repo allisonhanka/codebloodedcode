@@ -25,7 +25,7 @@ import java.util.Locale;
  *
  * @see <a href="http://www.adafruit.com/products/2472">Adafruit IMU</a>
  */
-@Autonomous(name = "GyroForwardStraight", group = "Sensor")
+@Autonomous(name = "GyroForwardStraight", group = "Test")
 
 public class GyroForwardStraight extends LinearOpMode
     {

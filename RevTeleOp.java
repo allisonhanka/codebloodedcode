@@ -108,7 +108,6 @@ public class RevTeleOp extends OpMode{
         // Use gamepad Directional Pad to tell the lift to go up and down 
         if (gamepad1.dpad_up)
             robot.liftMotor.setPower(LIFT_SPEED);
-        
         else if (gamepad1.dpad_down)
             robot.liftMotor.setPower(-LIFT_SPEED);
         else 
